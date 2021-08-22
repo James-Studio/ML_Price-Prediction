@@ -7,6 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM 
 
+
 def show_stock_price(data):
     x_axis = []
     for i in range(1,len(data["date"])+1):
@@ -50,6 +51,50 @@ def create_dataset(avg_data, data_step):
     x_data = np.array(x_data)
     y_data = np.array(y_data).reshape(-1,1)
     return x_data, y_data
+
+
+def get_future_prediction(model, day_pred, data_step, avg_price):
+    # index_range : len(data["date"])- data_step ~ len(data["date"])-1
+    # day_pred : 10 , data_step : the width of x_data
+    # x_data have to be 3 dimension
+    scaler = MinMaxScaler()
+    y_pred = np.array([])
+    data_leng = len(avg_price)
+    x_data = avg_price[(data_leng-data_step): ,0]
+    x_data = np.array(x_data).reshape(-1,1)
+    x_data = scaler.fit_transform(x_data)
+    x_data = x_data.reshape(1,-1,1)
+    # num_pred : catch the lastest Prediction
+    
+    print("start deep learning")
+    for i in range(0,day_pred):
+        num_pred = model.predict(x_data, verbose = 1, use_multiprocessing=True)
+        num_pred_ary = np.array(num_pred).reshape(1,1,1)
+        x_data = x_data[:,1:data_leng,:]
+        x_data = np.append(x_data,num_pred_ary,axis = 1)
+        #print("shape of x_data:",x_data.shape)
+        y_pred = np.append(y_pred,num_pred)
+        
+    y_pred = y_pred.reshape(-1,1)   
+    y_pred = scaler.inverse_transform(y_pred)
+    return y_pred
+
+def future_graph(data, avg_price, future_pred):
+    x_axis = []
+    len_pred = len(future_pred)
+    len_data = data.shape[0]
+    for i in range(1,len(data["date"])+1):
+        x_axis.append(i)
+    new_date = list(data["date"])
+    plt.plot(data["date"], avg_price,'b-', label = "actual price")
+    plt.plot(data["date"][len_data - len_pred:len_data], future_pred,"r-",label = "future price")
+    plt.xticks(x_axis[::100], new_date[::100], rotation=45)
+    plt.xlabel("date")
+    plt.ylabel("stock price")
+    plt.title("Future Prediction Result")
+    plt.legend()
+    plt.show()
+
 
 # make sure the computer is training with cpu 
 print("Num GPUs Avaliable:", len(tf.config.list_physical_devices('GPU')))
@@ -108,14 +153,22 @@ model.add(Dense(1))
 model.compile(loss = "mean_squared_error", optimizer = "adam")
 model.summary()
 # model train
-model.fit(x_train, y_train, validation_data = (x_test, y_test), epochs = 1, batch_size = 100, verbose = 1)
+model.fit(x_train, y_train, validation_data = (x_test, y_test), epochs = 50, batch_size = 10, verbose = 1)
 # model predict 
 y_pred = model.predict(x_test, verbose = 1, use_multiprocessing=True)
 
 # comparsion graph
 print("the shape of x_test:", x_test.shape)
 print("the shape of y_pred:",y_pred.shape)
+print("the shape of average price:", avg_price.shape)
 y_pred = scaler.inverse_transform(y_pred)
 compare_graph(data,avg_price, y_pred)
 
-# predict prices for future 5 days 
+# predict prices for future [day_num] days 
+day_pred = 100
+data_step = 100
+avg_price_new = np.array(avg_price[:len(avg_price)-day_pred, :])
+print(avg_price_new.shape)
+y_future_pred = get_future_prediction(model, day_pred, data_step, avg_price_new)
+print("the value of prediction:", y_future_pred)
+future_graph(data, avg_price, y_future_pred)
