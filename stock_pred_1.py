@@ -33,6 +33,7 @@ def compare_graph(data,avg_price, y_pred):
     plt.xticks(x_axis[::100], new_date[::100], rotation=45)
     plt.xlabel("date")
     plt.ylabel("stock price")
+    plt.title("Prediction Result")
     plt.legend()
     plt.show()
 
@@ -50,9 +51,11 @@ def create_dataset(avg_data, data_step):
     y_data = np.array(y_data).reshape(-1,1)
     return x_data, y_data
 
-    
+# make sure the computer is training with cpu 
+print("Num GPUs Avaliable:", len(tf.config.list_physical_devices('GPU')))
+
 # read the data
-data = pd.read_csv("dataset/AAP_data.csv")
+data = pd.read_csv("AAL_data.csv")
 #show_stock_price(data)
 print("data sample:\n",data.head())
 
@@ -108,7 +111,11 @@ model.summary()
 model.fit(x_train, y_train, validation_data = (x_test, y_test), epochs = 1, batch_size = 100, verbose = 1)
 # model predict 
 y_pred = model.predict(x_test, verbose = 1, use_multiprocessing=True)
-print("result :\n", y_pred)
 
-# comparsion
-compare_graph(avg_price, y_pred)
+# comparsion graph
+print("the shape of x_test:", x_test.shape)
+print("the shape of y_pred:",y_pred.shape)
+y_pred = scaler.inverse_transform(y_pred)
+compare_graph(data,avg_price, y_pred)
+
+# predict prices for future 5 days 
